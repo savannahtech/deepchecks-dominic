@@ -1,0 +1,49 @@
+version: "3.9"
+services:
+  deepchecks_logger:
+    container_name: deepchecks_logger
+    image: deepchecks_logger:1.0
+    build: .
+    ports:
+      - 3002:3002
+    environment:
+      - DB_URI=postgresql://user:postgres@deepchecks_db:5432/deepchecks
+      - BUNDLE_ERRORS=True
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - deepchecks_db
+      - redis
+
+  redis:
+    image: redis:alpine
+
+  worker:
+    build: .
+    container_name: deepchecks_worker
+    command: celery -A app.celery worker --loglevel=info
+    depends_on:
+      - deepchecks_logger
+      - redis
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_RUN_HOST=0.0.0.0
+      - DB_URI=postgresql://user:postgres@deepchecks_db:5432/deepchecks
+      - BUNDLE_ERRORS=True
+
+  deepchecks_db:
+    container_name: deepchecks_db
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=user
+      - POSTGRES_DB=deepchecks
+    volumes:
+      - type: volume
+        source: deepchecks_db_data
+        target: /temp/db/deepchecks_db_data
+
+volumes:
+  deepchecks_db_data:
